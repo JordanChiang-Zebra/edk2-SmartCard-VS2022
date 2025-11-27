@@ -73,7 +73,7 @@
   libccid/towitoko/pps.h
   libccid/utils.c
   libccid/utils.h
-
+  ..\..\..\MdePkg\Library\BaseLib\ChkStkGcc.c
 
 [LibraryClasses]
   UefiDriverEntryPoint
@@ -84,7 +84,7 @@
   UefiLib
   DevicePathLib
   DebugLib
-
+  IntrinsicLib
 
 [Protocols]
   gEfiDriverBindingProtocolGuid
@@ -95,3 +95,5 @@
 
 [Guids]
 
+[BuildOptions]
+  MSFT:*_*_*_CC_FLAGS = /GL- /Oi-

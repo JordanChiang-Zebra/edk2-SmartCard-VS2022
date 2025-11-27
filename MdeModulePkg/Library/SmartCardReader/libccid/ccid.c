@@ -1,25 +1,21 @@
 /*
-    ccid.c: CCID common code
-    Copyright (C) 2003-2010   Ludovic Rousseau
+	ccid.c: CCID common code
+	Copyright (C) 2003-2010   Ludovic Rousseau
 
-    This library is free software; you can redistribute it and/or
-    modify it under the terms of the GNU Lesser General Public
-    License as published by the Free Software Foundation; either
-    version 2.1 of the License, or (at your option) any later version.
+	This library is free software; you can redistribute it and/or
+	modify it under the terms of the GNU Lesser General Public
+	License as published by the Free Software Foundation; either
+	version 2.1 of the License, or (at your option) any later version.
 
-    This library is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-    Lesser General Public License for more details.
+	This library is distributed in the hope that it will be useful,
+	but WITHOUT ANY WARRANTY; without even the implied warranty of
+	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+	Lesser General Public License for more details.
 
 	You should have received a copy of the GNU Lesser General Public License
 	along with this library; if not, write to the Free Software Foundation,
 	Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 */
-
-/*
- * $Id: ccid.c 6976 2014-09-04 11:35:46Z rousseau $
- */
 
 #include <config.h>
 
@@ -71,6 +67,7 @@ int ccid_open_hack_pre(unsigned int reader_index)
 			ccid_descriptor->readTimeout = 60*1000; /* 60 seconds */
 			break;
 
+#ifdef ENABLE_ZLP
 		case GEMPCTWIN:
 		case GEMPCKEY:
 		case DELLSCRK:
@@ -83,9 +80,27 @@ int ccid_open_hack_pre(unsigned int reader_index)
 				DEBUG_INFO1("ZLP fixup");
 			}
 			break;
+#endif
 
+		case OZ776:
 		case OZ776_7772:
 			ccid_descriptor->dwMaxDataRate = 9600;
+			break;
+
+		case ElatecTWN4_CCID_CDC:
+		case ElatecTWN4_CCID:
+			/* Use a timeout of 1000 ms instead of 100 ms in
+			 * CmdGetSlotStatus() used by CreateChannelByNameOrChannel()
+			 * The reader answers after up to 1 s if no tag is present */
+			ccid_descriptor->readTimeout = DEFAULT_COM_READ_TIMEOUT * 10;
+			break;
+
+		case SCM_SCL011:
+		case IDENTIV_uTrust3700F:
+		case IDENTIV_uTrust3701F:
+		case IDENTIV_uTrust4701F:
+			/* The SCM SCL011 reader needs 350 ms to answer */
+			ccid_descriptor->readTimeout = DEFAULT_COM_READ_TIMEOUT * 4;
 			break;
 	}
 
@@ -107,7 +122,7 @@ int ccid_open_hack_pre(unsigned int reader_index)
 
 		DEBUG_COMM("ICCD type A");
 		(void)CmdPowerOff(reader_index);
-		(void)CmdPowerOn(reader_index, &n, tmp, CCID_CLASS_AUTO_VOLTAGE);
+		(void)CmdPowerOn(reader_index, &n, tmp, VOLTAGE_AUTO);
 		(void)CmdPowerOff(reader_index);
 	}
 
@@ -127,7 +142,7 @@ int ccid_open_hack_pre(unsigned int reader_index)
 		}
 
 		(void)CmdPowerOff(reader_index);
-		(void)CmdPowerOn(reader_index, &n, tmp, CCID_CLASS_AUTO_VOLTAGE);
+		(void)CmdPowerOn(reader_index, &n, tmp, VOLTAGE_AUTO);
 		(void)CmdPowerOff(reader_index);
 	}
 
@@ -145,11 +160,7 @@ static void dump_gemalto_firmware_features(struct GEMALTO_FIRMWARE_FEATURES *gff
 	DEBUG_INFO2("Dumping Gemalto firmware features (%zd bytes):",
 		sizeof(struct GEMALTO_FIRMWARE_FEATURES));
 
-#ifdef UEFI_DRIVER
-#define YESNO(x) (x) ? L"yes" : L"no"
-#else
 #define YESNO(x) (x) ? "yes" : "no"
-#endif
 
 	DEBUG_INFO2(" bLogicalLCDLineNumber: %d", gff->bLogicalLCDLineNumber);
 	DEBUG_INFO2(" bLogicalLCDRowNumber: %d", gff->bLogicalLCDRowNumber);
@@ -212,10 +223,10 @@ static void set_gemalto_firmware_features(unsigned int reader_index)
 		unsigned int len_features = sizeof *gf_features;
 		RESPONSECODE ret;
 
-		ret = CmdEscape(reader_index, cmd, sizeof cmd,
-			(unsigned char*)gf_features, &len_features, 0);
+		ret = CmdEscapeCheck(reader_index, cmd, sizeof cmd,
+			(unsigned char*)gf_features, &len_features, 0, TRUE);
 		if ((IFD_SUCCESS == ret) &&
-		    (len_features == sizeof *gf_features))
+			(len_features == sizeof *gf_features))
 		{
 			/* Command is supported if it succeeds at CCID level */
 			/* and returned size matches our expectation */
@@ -457,7 +468,7 @@ int ccid_open_hack_post(unsigned int reader_index)
 					length_res = sizeof(res);
 					if (IFD_SUCCESS == CmdEscape(reader_index, cmd2, sizeof(cmd2), res, &length_res, DEFAULT_COM_READ_TIMEOUT))
 					{
-						DEBUG_COMM("Disable SPE retry counter successfull");
+						DEBUG_COMM("Disable SPE retry counter successful");
 					}
 					else
 					{
@@ -470,10 +481,34 @@ int ccid_open_hack_post(unsigned int reader_index)
 		case HPSMARTCARDKEYBOARD:
 		case HP_CCIDSMARTCARDKEYBOARD:
 		case FUJITSUSMARTKEYB:
+		case CHICONYHPSKYLABKEYBOARD:
 			/* the Secure Pin Entry is bogus so disable it
-			 * http://martinpaljak.net/2011/03/19/insecure-hp-usb-smart-card-keyboard/
+			 * https://web.archive.org/web/20120320001756/http://martinpaljak.net/2011/03/19/insecure-hp-usb-smart-card-keyboard/
+			 *
+			 * The problem is that the PIN code entered using the Secure
+			 * Pin Entry function is also sent to the host.
 			 */
+
+		case C3PO_LTC31_v2:
 			ccid_descriptor->bPINSupport = 0;
+			break;
+
+		case HID_AVIATOR:      /* OMNIKEY Generic */
+		case HID_OMNIKEY_3X21: /* OMNIKEY 3121 or 3021 or 1021 */
+		case HID_OMNIKEY_6121: /* OMNIKEY 6121 */
+		case CHERRY_XX44:      /* Cherry Smart Terminal xx44 */
+		case FUJITSU_D323:     /* Fujitsu Smartcard Reader D323 */
+			/* The chip advertises pinpad but actually doesn't have one */
+			ccid_descriptor->bPINSupport = 0;
+			/* Firmware uses chaining */
+			ccid_descriptor->dwFeatures &= ~CCID_CLASS_EXCHANGE_MASK;
+			ccid_descriptor->dwFeatures |= CCID_CLASS_EXTENDED_APDU;
+			break;
+
+		case KOBIL_TRIBANK:
+			/* Firmware does NOT supported extended APDU */
+			ccid_descriptor->dwFeatures &= ~CCID_CLASS_EXCHANGE_MASK;
+			ccid_descriptor->dwFeatures |= CCID_CLASS_SHORT_APDU;
 			break;
 
 #if 0
@@ -514,6 +549,41 @@ int ccid_open_hack_post(unsigned int reader_index)
 			}
 			break;
 #endif
+		case CHERRY_KC1000SC:
+			if ((0x0100 == ccid_descriptor->IFD_bcdDevice)
+				&& (ccid_descriptor->dwFeatures & CCID_CLASS_EXCHANGE_MASK) == CCID_CLASS_SHORT_APDU)
+			{
+				/* firmware 1.00 is bogus
+				 * With a T=1 card and case 2 APDU (data from card to
+				 * host) the maximum size returned by the reader is 128
+				 * byes. The reader is then using chaining as with
+				 * extended APDU.
+				 */
+				ccid_descriptor->dwFeatures &= ~CCID_CLASS_EXCHANGE_MASK;
+				ccid_descriptor->dwFeatures |= CCID_CLASS_EXTENDED_APDU;
+			}
+			break;
+
+		case ElatecTWN4_CCID_CDC:
+		case ElatecTWN4_CCID:
+		case SCM_SCL011:
+			/* restore default timeout (modified in ccid_open_hack_pre()) */
+			ccid_descriptor->readTimeout = DEFAULT_COM_READ_TIMEOUT;
+			break;
+
+		case BIT4ID_MINILECTOR:
+			/* The firmware 1.11 advertises pinpad but actually doesn't
+			 * have one */
+			ccid_descriptor->bPINSupport = 0;
+			break;
+
+		case SAFENET_ETOKEN_5100:
+			/* the old SafeNet eToken 5110 SC (firmware 0.12 & 0.13)
+			 * does not like IFSD negotiation. So disable it. */
+			if ((0x0012 == ccid_descriptor->IFD_bcdDevice)
+				|| (0x0013 == ccid_descriptor->IFD_bcdDevice))
+				ccid_descriptor->dwFeatures |= CCID_CLASS_AUTO_IFSD;
+			break;
 	}
 
 	/* Gemalto readers may report additional information */
@@ -528,11 +598,14 @@ int ccid_open_hack_post(unsigned int reader_index)
  *					ccid_error
  *
  ****************************************************************************/
-void ccid_error(int error, const char *file, int line, const char *function)
+void ccid_error(int log_level, int error, const char *file, int line,
+	const char *function)
 {
 #ifndef NO_LOG
 	const char *text;
+#ifndef UEFI_DRIVER
 	char var_text[30];
+#endif
 
 	switch (error)
 	{
@@ -637,22 +710,25 @@ void ccid_error(int error, const char *file, int line, const char *function)
 			break;
 
 		default:
-#ifndef UEFI_DRIVER
+#ifdef UEFI_DRIVER
+			text = "Unknown CCID error";
+#else
 			if ((error >= 1) && (error <= 127))
 				(void)snprintf(var_text, sizeof(var_text), "error on byte %d",
 					error);
 			else
 				(void)snprintf(var_text, sizeof(var_text),
 					"Unknown CCID error: 0x%02X", error);
-#endif
 
 			text = var_text;
+#endif
 			break;
 	}
-#ifndef UEFI_DRIVER
-	log_msg(PCSC_LOG_ERROR, "%s:%d:%s %s", file, line, function, text);
+#ifdef UEFI_DRIVER
+	DEBUG((PCSC_LOG_ERROR, "%a:%d:%a %a\n", file, line, function, text));
+#else
+	log_msg(log_level, "%s:%d:%s %s", file, line, function, text);
 #endif
-
 #endif
 
 } /* ccid_error */

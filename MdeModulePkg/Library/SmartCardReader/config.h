@@ -37,6 +37,7 @@ POSSIBILITY OF SUCH DAMAGE.
 #ifndef uint8_t
 #define uint8_t unsigned char
 #endif
+#define uint16_t UINT16
 #define uint32_t UINT32
 
 #define MAX_BUFFER_SIZE_EXTENDED    (4 + 3 + (1<<16) + 3 + 2)   /**< enhanced (64K + APDU + Lc + Le + SW) Tx/Rx Buffer */
@@ -58,7 +59,11 @@ POSSIBILITY OF SUCH DAMAGE.
 
 /* TODO */
 #define usleep(a) 1
+#ifndef ENODEV
 #define ENODEV -1
+#endif
+#ifndef errno
 #define errno -1
+#endif
 #define htonl(a) (a)
 

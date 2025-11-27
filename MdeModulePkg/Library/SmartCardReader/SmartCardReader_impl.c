@@ -52,11 +52,11 @@ update_state(
 
   UsbCcidDevice->State = SCARD_UNKNOWN;
 
-  if (-1 == (reader_index = LunToReaderIndex(UsbCcidDevice->Lun))) {
+  if (-1 == (reader_index = LunToReaderIndex((int)UsbCcidDevice->Lun))) {
     return;
   }
 
-  response = CmdGetSlotStatus(reader_index, pcbuffer);
+  response = CmdGetSlotStatus((unsigned int)reader_index, pcbuffer);
 
   if (response != IFD_SUCCESS) {
     return;
@@ -67,10 +67,12 @@ update_state(
       UsbCcidDevice->State = SCARD_ACTIVE;
       break;
     case CCID_ICC_PRESENT_INACTIVE:
+      Log1(PCSC_LOG_DEBUG, "Card inactive");
       UsbCcidDevice->State = SCARD_INACTIVE;
       UsbCcidDevice->AtrLength = 0;
       break;
     case CCID_ICC_ABSENT:
+      Log1(PCSC_LOG_DEBUG, "Card absent");
       UsbCcidDevice->State = SCARD_ABSENT;
       UsbCcidDevice->AtrLength = 0;
       break;
@@ -133,7 +135,7 @@ SCardConnect (
     return EFI_SUCCESS;
   }
 
-  if (ATR_OK != ATR_InitFromArray(&atr, UsbCcidDevice->Atr, UsbCcidDevice->AtrLength)) {
+  if (ATR_OK != ATR_InitFromArray(&atr, UsbCcidDevice->Atr, (unsigned int)UsbCcidDevice->AtrLength)) {
     return EFI_DEVICE_ERROR;
   }
 
@@ -164,7 +166,7 @@ SCardConnect (
       UsbCcidDevice->CardProtocol = T_1;
       break;
   }
-  response = IFDHSetProtocolParameters(UsbCcidDevice->Lun, protocol, 0, 0, 0, 0);
+  response = IFDHSetProtocolParameters((DWORD)UsbCcidDevice->Lun, protocol, 0, 0, 0, 0);
   if (response != IFD_SUCCESS) {
     Status = EFI_UNSUPPORTED;
   }
@@ -204,7 +206,7 @@ SCardDisconnect (
 
     case SCARD_CA_COLDRESET:
       /* Power Off */
-      response = IFDHPowerICC(UsbCcidDevice->Lun, IFD_POWER_DOWN,
+      response = IFDHPowerICC((DWORD)UsbCcidDevice->Lun, IFD_POWER_DOWN,
           UsbCcidDevice->Atr, &length);
       if (response != IFD_SUCCESS) {
         Status = EFI_DEVICE_ERROR;
@@ -212,7 +214,7 @@ SCardDisconnect (
       }
 
       /* Power On */
-      response = IFDHPowerICC(UsbCcidDevice->Lun, IFD_POWER_UP,
+      response = IFDHPowerICC((DWORD)UsbCcidDevice->Lun, IFD_POWER_UP,
           UsbCcidDevice->Atr, &length);
       if (response != IFD_SUCCESS) {
         Status = EFI_NOT_READY;
@@ -223,7 +225,7 @@ SCardDisconnect (
 
     case SCARD_CA_WARMRESET:
       /* Reset */
-      response = IFDHPowerICC(UsbCcidDevice->Lun, IFD_RESET,
+      response = IFDHPowerICC((DWORD)UsbCcidDevice->Lun, IFD_RESET,
           UsbCcidDevice->Atr, &length);
       if (response != IFD_SUCCESS) {
         Status = EFI_DEVICE_ERROR;
@@ -234,7 +236,7 @@ SCardDisconnect (
 
     case SCARD_CA_UNPOWER:
       /* Power Off */
-      response = IFDHPowerICC(UsbCcidDevice->Lun, IFD_POWER_DOWN,
+      response = IFDHPowerICC((DWORD)UsbCcidDevice->Lun, IFD_POWER_DOWN,
           UsbCcidDevice->Atr, &length);
       if (response != IFD_SUCCESS) {
         Status = EFI_DEVICE_ERROR;
@@ -281,17 +283,17 @@ SCardStatus (
   update_state(UsbCcidDevice);
 
   if (State) {
-    *State = UsbCcidDevice->State;
+    *State = (UINT32)(UsbCcidDevice->State);
   }
   if (CardProtocol) {
-    *CardProtocol = UsbCcidDevice->CardProtocol;
+    *CardProtocol = (UINT32)(UsbCcidDevice->CardProtocol);
   }
 
   if (AtrLength) {
     old_AtrLength = *AtrLength;
     *AtrLength = UsbCcidDevice->AtrLength;
   }
-  if (old_AtrLength < UsbCcidDevice->AtrLength) {
+  if (old_AtrLength < (UINTN)(UsbCcidDevice->AtrLength)) {
     return EFI_BUFFER_TOO_SMALL;
   }
 
@@ -303,7 +305,7 @@ SCardStatus (
     old_ReaderNameLength = *ReaderNameLength;
     *ReaderNameLength = UsbCcidDevice->ReaderNameLength;
   }
-  if (old_ReaderNameLength < UsbCcidDevice->ReaderNameLength) {
+  if (old_ReaderNameLength < (UINTN)(UsbCcidDevice->ReaderNameLength)) {
     return EFI_BUFFER_TOO_SMALL;
   }
 
@@ -349,8 +351,8 @@ SCardTransmit (
   }
 
   RxLength = sizeof RxBuffer;
-  SendPci.Protocol = UsbCcidDevice->CardProtocol;
-  response = IFDHTransmitToICC(UsbCcidDevice->Lun, SendPci, CAPDU, CAPDULength, RxBuffer, &RxLength, NULL);
+  SendPci.Protocol = (DWORD)(UsbCcidDevice->CardProtocol);
+  response = IFDHTransmitToICC((DWORD)(UsbCcidDevice->Lun), SendPci, CAPDU, (DWORD)CAPDULength, RxBuffer, &RxLength, NULL);
   if (*RAPDULength < RxLength) {
     Status = EFI_BUFFER_TOO_SMALL;
   }
@@ -397,8 +399,8 @@ SCardControl (
     OutBufferLength = &dummy;
   }
 
-  dwBytesReturned = *OutBufferLength;
-  response = IFDHControl(UsbCcidDevice->Lun, ControlCode, InBuffer, InBufferLength, OutBuffer, *OutBufferLength, &dwBytesReturned);
+  dwBytesReturned = (DWORD)(*OutBufferLength);
+  response = IFDHControl((DWORD)(UsbCcidDevice->Lun), ControlCode, InBuffer, (DWORD)InBufferLength, OutBuffer, (DWORD) *OutBufferLength, &dwBytesReturned);
   *OutBufferLength = dwBytesReturned;
 
   switch (response) {
@@ -435,8 +437,8 @@ SCardGetAttrib (
   }
 
   UsbCcidDevice = USB_CCID_DEV_FROM_SMART_CARD_READER_PROTOCOL (This);
-  dwBytesReturned = *OutBufferLength;
-  response = IFDHGetCapabilities(UsbCcidDevice->Lun, Attrib, &dwBytesReturned, OutBuffer);
+  dwBytesReturned = (DWORD)(*OutBufferLength);
+  response = IFDHGetCapabilities((DWORD)(UsbCcidDevice->Lun), Attrib, &dwBytesReturned, OutBuffer);
   *OutBufferLength = dwBytesReturned;
 
   switch (response) {

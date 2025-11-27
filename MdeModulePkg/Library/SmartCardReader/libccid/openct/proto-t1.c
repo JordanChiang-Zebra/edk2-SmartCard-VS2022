@@ -140,7 +140,7 @@ int t1_set_param(t1_state_t * t1, int type, long value)
 		t1->state = value;
 		break;
 	case IFD_PROTOCOL_T1_MORE:
-		t1->more = value;
+		t1->more = (char)value;
 		break;
 	default:
 		DEBUG_INFO2("Unsupported parameter %d", type);
@@ -181,7 +181,7 @@ int t1_transceive(t1_state_t * t1, unsigned int dad,
 	ct_buf_init(&rbuf, rcv_buf, rcv_len);
 
 	/* Send the first block */
-	slen = t1_build(t1, sdata, dad, T1_I_BLOCK, &sbuf, &last_send);
+	slen = t1_build(t1, sdata, (unsigned char) dad, T1_I_BLOCK, &sbuf, &last_send);
 
 	while (1) {
 		unsigned char pcb;
@@ -206,7 +206,7 @@ int t1_transceive(t1_state_t * t1, unsigned int dad,
 			}
 
 			slen = t1_build(t1, sdata,
-					dad, T1_R_BLOCK | T1_EDC_ERROR,
+					(unsigned char) dad, T1_R_BLOCK | T1_EDC_ERROR,
 					NULL, NULL);
 			continue;
 		}
@@ -234,7 +234,7 @@ int t1_transceive(t1_state_t * t1, unsigned int dad,
 			}
 
 			slen = t1_build(t1, sdata,
-				dad, T1_R_BLOCK | T1_OTHER_ERROR,
+				(unsigned char) dad, T1_R_BLOCK | T1_OTHER_ERROR,
 				NULL, NULL);
 			continue;
 		}
@@ -254,7 +254,7 @@ int t1_transceive(t1_state_t * t1, unsigned int dad,
 			}
 
 			slen = t1_build(t1, sdata,
-				dad, T1_R_BLOCK | T1_EDC_ERROR,
+				(unsigned char) dad, T1_R_BLOCK | T1_EDC_ERROR,
 				NULL, NULL);
 			continue;
 		}
@@ -280,7 +280,7 @@ int t1_transceive(t1_state_t * t1, unsigned int dad,
 				}
 
 				slen = t1_build(t1, sdata,
-						dad, T1_R_BLOCK | T1_OTHER_ERROR,
+						(unsigned char) dad, T1_R_BLOCK | T1_OTHER_ERROR,
 						NULL, NULL);
 				continue;
 			}
@@ -306,7 +306,7 @@ int t1_transceive(t1_state_t * t1, unsigned int dad,
 
 				DEBUG_COMM("R-Block required");
 				slen = t1_build(t1, sdata,
-						dad, T1_R_BLOCK | T1_OTHER_ERROR,
+						(unsigned char) dad, T1_R_BLOCK | T1_OTHER_ERROR,
 						NULL, NULL);
 				continue;
 			}
@@ -326,7 +326,7 @@ int t1_transceive(t1_state_t * t1, unsigned int dad,
 
 				DEBUG_COMM("");
 				slen = t1_build(t1, sdata,
-						dad, T1_R_BLOCK,
+						(unsigned char) dad, T1_R_BLOCK,
 						NULL, NULL);
 				break;
 			}
@@ -345,7 +345,7 @@ int t1_transceive(t1_state_t * t1, unsigned int dad,
 			if (ct_buf_avail(&sbuf) == 0)
 				goto resync;
 
-			slen = t1_build(t1, sdata, dad, T1_I_BLOCK,
+			slen = t1_build(t1, sdata, (unsigned char) dad, T1_I_BLOCK,
 					&sbuf, &last_send);
 			break;
 
@@ -371,7 +371,7 @@ int t1_transceive(t1_state_t * t1, unsigned int dad,
 				if (retries <= 0)
 					goto resync;
 
-				slen = t1_build(t1, sdata, dad,
+				slen = t1_build(t1, sdata, (unsigned char) dad,
 						T1_R_BLOCK | T1_OTHER_ERROR,
 						NULL, NULL);
 				continue;
@@ -388,7 +388,7 @@ int t1_transceive(t1_state_t * t1, unsigned int dad,
 			if ((pcb & T1_MORE_BLOCKS) == 0)
 				goto done;
 
-			slen = t1_build(t1, sdata, dad, T1_R_BLOCK, NULL, NULL);
+			slen = t1_build(t1, sdata, (unsigned char) dad, T1_R_BLOCK, NULL, NULL);
 			break;
 
 		case T1_S_BLOCK:
@@ -401,7 +401,7 @@ int t1_transceive(t1_state_t * t1, unsigned int dad,
 				resyncs = 3;
 				retries = t1->retries;
 				ct_buf_init(&rbuf, rcv_buf, rcv_len);
-				slen = t1_build(t1, sdata, dad, T1_I_BLOCK,
+				slen = t1_build(t1, sdata, (unsigned char) dad, T1_I_BLOCK,
 						&sbuf, &last_send);
 				continue;
 			}
@@ -422,7 +422,7 @@ int t1_transceive(t1_state_t * t1, unsigned int dad,
 
 				DEBUG_CRITICAL("wrong response S-BLOCK received");
 				slen = t1_build(t1, sdata,
-						dad, T1_R_BLOCK | T1_OTHER_ERROR,
+						(unsigned char) dad, T1_R_BLOCK | T1_OTHER_ERROR,
 						NULL, NULL);
 				continue;
 			}
@@ -435,7 +435,7 @@ int t1_transceive(t1_state_t * t1, unsigned int dad,
 				if (sdata[LEN] != 0)
 				{
 					DEBUG_COMM2("Wrong length: %d", sdata[LEN]);
-					slen = t1_build(t1, sdata, dad,
+					slen = t1_build(t1, sdata, (unsigned char) dad,
 						T1_R_BLOCK | T1_OTHER_ERROR,
 						NULL, NULL);
 					continue;
@@ -449,7 +449,7 @@ int t1_transceive(t1_state_t * t1, unsigned int dad,
 				if (sdata[LEN] != 0)
 				{
 					DEBUG_COMM2("Wrong length: %d", sdata[LEN]);
-					slen = t1_build(t1, sdata, dad,
+					slen = t1_build(t1, sdata, (unsigned char) dad,
 						T1_R_BLOCK | T1_OTHER_ERROR,
 						NULL, NULL);
 					continue;
@@ -463,7 +463,7 @@ int t1_transceive(t1_state_t * t1, unsigned int dad,
 				if (sdata[LEN] != 1)
 				{
 					DEBUG_COMM2("Wrong length: %d", sdata[LEN]);
-					slen = t1_build(t1, sdata, dad,
+					slen = t1_build(t1, sdata, (unsigned char) dad,
 						T1_R_BLOCK | T1_OTHER_ERROR,
 						NULL, NULL);
 					continue;
@@ -480,7 +480,7 @@ int t1_transceive(t1_state_t * t1, unsigned int dad,
 				if (sdata[LEN] != 1)
 				{
 					DEBUG_COMM2("Wrong length: %d", sdata[LEN]);
-					slen = t1_build(t1, sdata, dad,
+					slen = t1_build(t1, sdata, (unsigned char) dad,
 						T1_R_BLOCK | T1_OTHER_ERROR,
 						NULL, NULL);
 					continue;
@@ -496,7 +496,7 @@ int t1_transceive(t1_state_t * t1, unsigned int dad,
 				goto resync;
 			}
 
-			slen = t1_build(t1, sdata, dad,
+			slen = t1_build(t1, sdata, (unsigned char) dad,
 				T1_S_BLOCK | T1_S_RESPONSE | T1_S_TYPE(pcb),
 				&tbuf, NULL);
 		}
@@ -515,7 +515,7 @@ resync:
 		resyncs--;
 		t1->ns = 0;
 		t1->nr = 0;
-		slen = t1_build(t1, sdata, dad, T1_S_BLOCK | T1_S_RESYNC, NULL,
+		slen = t1_build(t1, sdata, (unsigned char) dad, T1_S_BLOCK | T1_S_RESYNC, NULL,
 				NULL);
 		t1->state = RESYNCH;
 		t1->more = FALSE;
@@ -583,7 +583,7 @@ unsigned int t1_build(t1_state_t * t1, unsigned char *block,
 
 	block[0] = dad;
 	block[1] = pcb;
-	block[2] = len;
+	block[2] = (unsigned char) len;
 
 	if (len)
 		memcpy(block + 3, ct_buf_head(bp), len);
@@ -672,7 +672,7 @@ static int t1_xcv(t1_state_t * t1, unsigned char *block, size_t slen,
 	{
 		rmax = 3;
 
-		n = CCID_Transmit(t1 -> lun, slen, block, rmax, t1->wtx);
+		n = CCID_Transmit(t1 -> lun, slen, block, (unsigned short)rmax, t1->wtx);
 		if (n != IFD_SUCCESS)
 			return -1;
 
@@ -689,7 +689,7 @@ static int t1_xcv(t1_state_t * t1, unsigned char *block, size_t slen,
 
 		rmax = block[2] + 1;
 
-		n = CCID_Transmit(t1 -> lun, 0, block, rmax, t1->wtx);
+		n = CCID_Transmit(t1 -> lun, 0, block, (unsigned short)rmax, t1->wtx);
 		if (n != IFD_SUCCESS)
 			return -1;
 
@@ -753,7 +753,7 @@ int t1_negotiate_ifsd(t1_state_t * t1, unsigned int dad, int ifsd)
 	retries = t1->retries;
 
 	/* S-block IFSD request */
-	snd_buf[0] = ifsd;
+	snd_buf[0] = (unsigned char) ifsd;
 	snd_len = 1;
 
 	/* Initialize send/recv buffer */

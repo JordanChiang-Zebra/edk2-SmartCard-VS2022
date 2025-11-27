@@ -284,7 +284,7 @@ SmartCardReaderDriverBindingSupported (
 }
 
 /**
-  Initialize the USB CCID device.
+  Unitialize the USB CCID device.
 
   @param  UsbCcidDev            Device instance to be initialized.
 
@@ -301,7 +301,7 @@ FinalizeUsbCcidDevice (
   EFI_STATUS status = EFI_SUCCESS;
   Log0(PCSC_LOG_DEBUG);
 
-  if (IFD_SUCCESS != IFDHCloseChannel(UsbCcidDev->Lun)) {
+  if (IFD_SUCCESS != IFDHCloseChannel((DWORD)UsbCcidDev->Lun)) {
     status = EFI_UNSUPPORTED;
   }
 
@@ -336,7 +336,7 @@ InitializeUsbCcidDevice (
 
   Log0(PCSC_LOG_DEBUG);
 
-  if (IFD_SUCCESS != IFDHCreateChannel(Lun, (DWORD)UsbCcidDevice)) {
+  if (IFD_SUCCESS != IFDHCreateChannel(Lun, (void *)UsbCcidDevice)) {
     return EFI_UNSUPPORTED;
   }
 
@@ -363,7 +363,7 @@ InitializeUsbCcidDevice (
   }
 
   /* Get Manufacturer string */
-  for (Index = 0; Index < TableSize / sizeof (LangIDTable[0]); Index++) {
+  for (Index = 0; Index < (INTN)(TableSize / sizeof (LangIDTable[0])); Index++) {
     ManufacturerString = NULL;
     Status = UsbIo->UsbGetStringDescriptor(UsbIo,
         LangIDTable[Index],
@@ -374,15 +374,15 @@ InitializeUsbCcidDevice (
       continue;
     }
 
-    StrCpy(UsbCcidDevice->ReaderName, ManufacturerString);
-    StrCat(UsbCcidDevice->ReaderName, L" ");
+    StrCpyS(UsbCcidDevice->ReaderName, sizeof(UsbCcidDevice->ReaderName)/sizeof(CHAR16), ManufacturerString);
+    StrCatS(UsbCcidDevice->ReaderName, sizeof(UsbCcidDevice->ReaderName)/sizeof(CHAR16), L" ");
 
     FreePool(ManufacturerString);
     break;
   }
 
   /* Get Product string */
-  for (Index = 0; Index < TableSize / sizeof (LangIDTable[0]); Index++) {
+  for (Index = 0; Index < (INTN)(TableSize / sizeof (LangIDTable[0])); Index++) {
     ProductString = NULL;
     Status = UsbIo->UsbGetStringDescriptor(UsbIo,
         LangIDTable[Index],
@@ -393,7 +393,7 @@ InitializeUsbCcidDevice (
       continue;
     }
 
-    StrCat(UsbCcidDevice->ReaderName, ProductString);
+    StrCatS(UsbCcidDevice->ReaderName, sizeof(UsbCcidDevice->ReaderName)/sizeof(CHAR16), ProductString);
 
     FreePool(ProductString);
     break;
@@ -411,14 +411,14 @@ error:
 
   /* Add the Lun */
   UnicodeSPrint(TxtLun, sizeof(TxtLun)/sizeof(TxtLun[0]), L" %d", UsbCcidDevice->Lun);
-  StrCat(UsbCcidDevice->ReaderName, TxtLun);
+  StrCatS(UsbCcidDevice->ReaderName, sizeof(UsbCcidDevice->ReaderName)/sizeof(CHAR16), TxtLun);
 
   /* Length (in bytes) including Null terminator */
   UsbCcidDevice->ReaderNameLength = StrSize(UsbCcidDevice->ReaderName);
 
   /* set the reader name to the lower level */
-  reader_index = LunToReaderIndex(UsbCcidDevice->Lun);
-  ccid_slot = get_ccid_slot(reader_index);
+  reader_index = LunToReaderIndex((int)UsbCcidDevice->Lun);
+  ccid_slot = get_ccid_slot((unsigned int)reader_index);
   ccid_slot->readerName = UsbCcidDevice->ReaderName;
 
   return EFI_SUCCESS;
@@ -491,12 +491,11 @@ SmartCardReaderDriverBindingStart (
     .SCardConnect = SCardConnect,
     .SCardDisconnect = SCardDisconnect,
     .SCardStatus = SCardStatus,
-    .SCardTransmit =SCardTransmit,
+    .SCardTransmit = SCardTransmit,
     .SCardControl = SCardControl,
     .SCardGetAttrib = SCardGetAttrib
   };
   INTN slot, reader_index;
-  CcidDesc *ccid_slot;
   _ccid_descriptor *ccid_descriptor;
   USB_CCID_DEV *previous_UsbCcidDevice;
 
@@ -565,9 +564,8 @@ SmartCardReaderDriverBindingStart (
     );
 
   /* multi slot readers */
-  reader_index = LunToReaderIndex(UsbCcidDevice->Lun);
-  ccid_slot = get_ccid_slot(reader_index);
-  ccid_descriptor = get_ccid_descriptor(reader_index);
+  reader_index = LunToReaderIndex((int)UsbCcidDevice->Lun);
+  ccid_descriptor = get_ccid_descriptor((unsigned int)reader_index);
   previous_UsbCcidDevice = UsbCcidDevice;
 
   for (slot=1; slot <= ccid_descriptor->bMaxSlotIndex; slot++) {
@@ -586,7 +584,7 @@ SmartCardReaderDriverBindingStart (
     ASSERT (new_UsbCcidDevice != NULL);
 
     /* Copy the USB device */
-    duplicate_usb_device(reader_index, new_reader_index);
+    duplicate_usb_device((unsigned int)reader_index, (unsigned int)new_reader_index);
 
     /* copy the UEFI device */
     *new_UsbCcidDevice = *UsbCcidDevice;
@@ -595,14 +593,14 @@ SmartCardReaderDriverBindingStart (
 
     /* Add the slot number */
     UnicodeSPrint(TxtSlot, sizeof(TxtSlot)/sizeof(TxtSlot[0]), L", %d", slot);
-    StrCat(new_UsbCcidDevice->ReaderName, TxtSlot);
+    StrCatS(new_UsbCcidDevice->ReaderName, sizeof(UsbCcidDevice->ReaderName)/sizeof(CHAR16), TxtSlot);
 
     /* Set the reader name to the lower level */
-    new_reader_index = LunToReaderIndex(new_UsbCcidDevice->Lun);
-    get_ccid_slot(new_reader_index)->readerName = new_UsbCcidDevice->ReaderName;
+    new_reader_index = LunToReaderIndex((int)new_UsbCcidDevice->Lun);
+    get_ccid_slot((unsigned int)new_reader_index)->readerName = new_UsbCcidDevice->ReaderName;
 
     /* Set the slot number ta the lower level */
-    get_ccid_descriptor(new_reader_index)->bCurrentSlotIndex = slot;
+    get_ccid_descriptor((unsigned int)new_reader_index)->bCurrentSlotIndex = (char)slot;
 
     /* New Lun for a new slot */
     Lun++;

@@ -17,9 +17,7 @@
 	Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 */
 
-/*
- * $Id: defs.h 6926 2014-06-17 09:22:00Z rousseau $
- */
+#define max( a, b )   ( ( ( a ) > ( b ) ) ? ( a ) : ( b ) )
 
 #include <pcsclite.h>
 
@@ -102,6 +100,7 @@ typedef enum {
 #define ClosePort CloseSerial
 #define ReadPort ReadSerial
 #define WritePort WriteSerial
+#define DisconnectPort DisconnectSerial
 #include "ccid_serial.h"
 
 #elif defined(UEFI_DRIVER)
@@ -111,6 +110,7 @@ typedef enum {
 #define ClosePort CloseUEFI
 #define ReadPort ReadUEFI
 #define WritePort WriteUEFI
+#define DisconnectPort DisconnectUEFI
 #include "ccid_uefi.h"
 
 #else
@@ -120,6 +120,7 @@ typedef enum {
 #define ClosePort CloseUSB
 #define ReadPort ReadUSB
 #define WritePort WriteUSB
+#define DisconnectPort DisconnectUSB
 #include "ccid_usb.h"
 
 #endif

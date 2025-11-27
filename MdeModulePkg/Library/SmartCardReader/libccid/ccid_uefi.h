@@ -21,9 +21,9 @@
  * $Id: ccid_uefi.h 5473 2011-01-04 09:52:26Z rousseau $
  */
 
-#ifndef __CCID_UEF_H__
+#ifndef __CCID_UEFI_H__
 #define __CCID_UEFI_H__
-status_t OpenUEFI(unsigned int reader_index, DWORD channel);
+status_t OpenUEFI(unsigned int reader_index, void *channel);
 
 status_t OpenUEFIByName(unsigned int reader_index, /*@null@*/ char *device);
 
@@ -31,12 +31,17 @@ status_t WriteUEFI(unsigned int reader_index, unsigned int length,
 	unsigned char *Buffer);
 
 status_t ReadUEFI(unsigned int reader_index, unsigned int *length,
-	/*@out@*/ unsigned char *Buffer);
+	/*@out@*/ unsigned char *Buffer, int bSeq);
 
 status_t CloseUEFI(unsigned int reader_index);
 
+status_t DisconnectUEFI(unsigned int reader_index);
+
 int ControlUSB(int reader_index, int requesttype, int request, int value,
 	unsigned char *bytes, unsigned int size);
+
+uint8_t get_ccid_usb_bus_number(int reader_index);
+uint8_t get_ccid_usb_device_address(int reader_index);
 
 void duplicate_usb_device(unsigned int reader_index,
 	unsigned int new_reader_index);

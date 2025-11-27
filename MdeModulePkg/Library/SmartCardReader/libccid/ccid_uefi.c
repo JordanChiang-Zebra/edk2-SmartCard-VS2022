@@ -98,7 +98,7 @@ static _usbDevice usbDevice[CCID_DRIVER_MAX_READERS];
  *					OpenUEFI
  *
  ****************************************************************************/
-status_t OpenUEFI(unsigned int reader_index, DWORD Channel)
+status_t OpenUEFI(unsigned int reader_index, void *Channel)
 {
 	int return_value = STATUS_UNSUCCESSFUL;
 	USB_CCID_DEV *UsbCcidDevice = (USB_CCID_DEV *)Channel;
@@ -110,6 +110,12 @@ status_t OpenUEFI(unsigned int reader_index, DWORD Channel)
 	unsigned char * device_descriptor, *ccid_descriptor;
 	EFI_USB_DEVICE_REQUEST  DevReq;
 	UINT32 Status_uint;
+
+	if(Channel == NULL)
+	{
+		DEBUG_COMM("Channel is NULL");
+		return STATUS_NO_SUCH_DEVICE;
+	}
 
 	DEBUG_COMM3("Reader index: %X, Channel: %p", reader_index, UsbCcidDevice);
 
@@ -168,7 +174,7 @@ status_t OpenUEFI(unsigned int reader_index, DWORD Channel)
 	/* Get Endpoints values*/
 	for (index = 0; index < EndpointNumber; index++)
 	{
-		UsbIo->UsbGetEndpointDescriptor (UsbIo, index, &EndpointDescriptor);
+		UsbIo->UsbGetEndpointDescriptor (UsbIo, (UINT8) index, &EndpointDescriptor);
 
 		if ((EndpointDescriptor.Attributes & (BIT0 | BIT1)) == USB_ENDPOINT_INTERRUPT)
 			CopyMem(&usbDevice[reader_index].interrupt, &EndpointDescriptor, sizeof(EndpointDescriptor));
@@ -260,9 +266,9 @@ status_t OpenUEFI(unsigned int reader_index, DWORD Channel)
 	usbDevice[reader_index].ccid.bVoltageSupport = ccid_descriptor[5];
 	usbDevice[reader_index].ccid.sIFD_serial_number = NULL;
 	usbDevice[reader_index].ccid.gemalto_firmware_features = NULL;
-	usbDevice[reader_index].ccid.zlp = FALSE;
 	usbDevice[reader_index].ccid.sIFD_iManufacturer = NULL;
 	usbDevice[reader_index].ccid.IFD_bcdDevice = UsbCcidDevice->DeviceDescriptor.BcdDevice;
+	usbDevice[reader_index].ccid.dwProtocols = dw2i(ccid_descriptor, 6);
 
 	/* no error */
 	return_value = STATUS_SUCCESS;
@@ -322,9 +328,8 @@ status_t WriteUEFI(unsigned int reader_index, unsigned int length,
  *
  ****************************************************************************/
 status_t ReadUEFI(unsigned int reader_index, unsigned int * length,
-	unsigned char *buffer)
+	unsigned char *buffer, int bSeq)
 {
-	_ccid_descriptor *ccid_descriptor = get_ccid_descriptor(reader_index);
 	int duplicate_frame = 0;
 	UINT32 TransStatus;
 	EFI_STATUS Status;
@@ -345,13 +350,14 @@ read_again:
 		return STATUS_UNSUCCESSFUL;
 	}
 
-	*length = DataLength;
+	*length = (unsigned int)DataLength;
 
 	DEBUG_XXD("<", buffer, *length);
 
 #define BSEQ_OFFSET 6
 	if ((*length >= BSEQ_OFFSET)
-		&& (buffer[BSEQ_OFFSET] < *ccid_descriptor->pbSeq -1))
+		&& (bSeq != -1)
+		&& (buffer[BSEQ_OFFSET] != bSeq))
 	{
 		duplicate_frame++;
 		if (duplicate_frame > 10)
@@ -422,6 +428,41 @@ status_t CloseUEFI(unsigned int reader_index)
 
 	return STATUS_SUCCESS;
 } /* CloseUEFI */
+
+
+/*****************************************************************************
+ *
+ *					DisconnectUEFI
+ *
+ ****************************************************************************/
+status_t DisconnectUEFI(unsigned int reader_index)
+{
+	DEBUG_COMM("Disconnect reader");
+
+	return STATUS_SUCCESS;
+} /* DisconnectUEFI */
+
+
+/*****************************************************************************
+ *
+ *					get_ccid_usb_bus_number
+ *
+ ****************************************************************************/
+uint8_t get_ccid_usb_bus_number(int reader_index)
+{
+	return usbDevice[reader_index].bus_number;
+}
+
+
+/*****************************************************************************
+ *
+ *					get_ccid_usb_device_address
+ *
+ ****************************************************************************/
+uint8_t get_ccid_usb_device_address(int reader_index)
+{
+	return usbDevice[reader_index].device_address;
+}
 
 
 /*****************************************************************************
